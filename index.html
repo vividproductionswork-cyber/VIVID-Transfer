@@ -44,6 +44,9 @@
   .frow { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
   .frow:last-child { border-bottom: 0; }
   .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fname > * { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fsize { flex: none; }
+  @media (max-width: 480px) { .frow { flex-wrap: wrap; } .frow .fname { flex-basis: 100%; } }
   .fsize { color: var(--muted); font-size: 14px; white-space: nowrap; }
   .fmeta { color: var(--muted); font-size: 13px; }
   .x { background: none; border: 0; color: var(--muted); font-size: 18px; padding: 4px 8px; }
@@ -77,10 +80,12 @@
 
   /* Link box */
   .linkbox { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
-  .linkbox code { flex: 1; overflow-x: auto; white-space: nowrap; background: var(--soft); padding: 12px 14px; border-radius: 10px; font-size: 14px; }
+  .linkbox code { flex: 1; overflow-x: auto; white-space: nowrap; background: var(--soft); padding: 12px 14px; border-radius: 10px; font-size: 14px; font-family: inherit; }
+  @media (max-width: 480px) { main { padding: 32px 16px 64px; } .topbar { padding: 14px 16px; } }
 
   /* Table */
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .card:has(table) { overflow-x: auto; }
   th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
   th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
   td a { color: var(--ink); font-weight: 600; text-decoration: none; }
@@ -283,6 +288,8 @@
         return renderSent(created);
       } catch (e) {
         S.busy = false; sendBtn.disabled = false; sendBtn.textContent = 'Transfer';
+        var pb = document.getElementById('progress-bar');
+        if (pb) pb.style.background = 'var(--danger, #c62828)';
         err.textContent = e.message;
       }
     });
@@ -293,6 +300,7 @@
     ]);
     function progressShow(label, frac) {
       progress.classList.remove('hidden');
+      sendBtn.textContent = 'Uploading…';
       document.getElementById('progress-text').textContent = label + ' (' + Math.round(frac * 100) + '%)';
       document.getElementById('progress-bar').style.width = (frac * 100).toFixed(1) + '%';
     }
@@ -307,8 +315,8 @@
       h('label', { text: 'Your name' }), nameIn,
       h('label', { text: 'Send to' }), toIn,
       h('label', { text: 'Message' }), msgIn,
-      h('div', { class: 'row-actions' }, [h('span', { class: 'muted', text: 'Expires 15 days after sending' }), sendBtn]),
       progress,
+      h('div', { class: 'row-actions' }, [h('span', { class: 'muted', text: 'Expires 15 days after sending' }), sendBtn]),
       err
     ]));
     paint();
@@ -338,7 +346,10 @@
     $app().appendChild(h('p', { class: 'sub', text: 'Every transfer, who it went to, and what has been downloaded.' }));
     var card = h('div', { class: 'card' });
     if (!S.transfers.length) {
-      card.appendChild(h('p', { class: 'muted', text: 'No transfers yet.' }));
+      card.appendChild(h('p', { class: 'muted', text: 'No transfers yet. Send your first set of files to get started.' }));
+      card.appendChild(h('div', { class: 'row-actions' }, [
+        h('button', { class: 'btn', text: 'Send files', on: { click: function () { S.tab = 'send'; renderSend(); } } })
+      ]));
     } else {
       var rows = S.transfers.map(function (t) {
         var copyBtn = h('button', { class: 'btn ghost small', text: 'Copy link' });
@@ -445,6 +456,7 @@
       if (/confirm your email/i.test(e.message)) {
         sessionStorage.removeItem('vt_token_' + S.tid);
         S.gate = null;
+        S.who = null;
         renderTransferPage();
         return;
       }
@@ -580,7 +592,11 @@
       S.transfers = st.transfers;
     } catch (e) {
       clear();
-      $app().appendChild(h('div', { class: 'card' }, [h('h2', { text: 'Something went wrong' }), h('p', { class: 'sub', text: e.message })]));
+      $app().appendChild(h('div', { class: 'card' }, [
+        h('h2', { text: 'Something went wrong' }),
+        h('p', { class: 'sub', text: e.message }),
+        h('button', { class: 'btn ghost', text: 'Try again', on: { click: function () { location.reload(); } } })
+      ]));
       return;
     }
     render();
