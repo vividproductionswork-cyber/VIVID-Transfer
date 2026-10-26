@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vivid Transfer</title>
+<style>
+  :root {
+    --ink: #0d0d0d; --muted: #6b6b6b; --line: #e6e6e6; --soft: #f5f5f5;
+    --accent: #1f5eff; --accent-ink: #ffffff; --danger: #c62828; --ok: #0a7d3b;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); background: #fff; }
+  button { font: inherit; cursor: pointer; }
+  input, textarea { font: inherit; }
+
+  /* Top bar */
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid var(--line); }
+  .brand { font-weight: 700; font-size: 18px; letter-spacing: -0.2px; }
+  .tabs { display: flex; gap: 6px; }
+  .tab { background: none; border: 0; padding: 8px 12px; border-radius: 8px; color: var(--muted); }
+  .tab.on { color: var(--ink); background: var(--soft); }
+
+  /* Layout */
+  main { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 30px; letter-spacing: -0.5px; margin: 0 0 8px; }
+  h2 { font-size: 20px; margin: 0 0 6px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-bottom: 18px; background: #fff; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .hidden { display: none !important; }
+
+  /* Drop zone */
+  .drop { border: 2px dashed #cfd6e4; border-radius: var(--radius); padding: 48px 24px; text-align: center; background: #fbfcfe; transition: border-color .15s, background .15s; cursor: pointer; }
+  .drop.over { border-color: var(--accent); background: #f0f5ff; }
+  .drop .big { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .drop .small { color: var(--muted); font-size: 14px; }
+  .drop .pick { margin-top: 14px; }
+
+  /* File rows */
+  .files { margin-top: 18px; }
+  .frow { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .frow:last-child { border-bottom: 0; }
+  .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fsize { color: var(--muted); font-size: 14px; white-space: nowrap; }
+  .fmeta { color: var(--muted); font-size: 13px; }
+  .x { background: none; border: 0; color: var(--muted); font-size: 18px; padding: 4px 8px; }
+  .x:hover { color: var(--ink); }
+  .row-actions { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 14px; }
+
+  /* Buttons */
+  .btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; padding: 12px 20px; font-weight: 600; text-decoration: none; display: inline-block; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.ghost { background: #fff; color: var(--ink); border: 1px solid #d5d5d5; }
+  .btn.small { padding: 7px 12px; font-size: 14px; border-radius: 8px; }
+  .btn.danger { background: #fff; color: var(--danger); border: 1px solid #f0c7c7; }
+
+  /* Form */
+  label { display: block; font-size: 14px; font-weight: 600; margin: 16px 0 6px; }
+  input[type=text], input[type=email], textarea { width: 100%; padding: 12px 14px; border: 1px solid #d5d5d5; border-radius: 10px; background: #fff; }
+  input:focus, textarea:focus { outline: 2px solid #bcd0ff; border-color: var(--accent); }
+  textarea { min-height: 72px; resize: vertical; }
+
+  /* Status */
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
+  .pill.active { background: #e8f7ee; color: var(--ok); }
+  .pill.expired, .pill.deleted { background: #fdecec; color: var(--danger); }
+  .banner { background: #fff8e6; color: #7a5200; border: 1px solid #f5e0a6; border-radius: 10px; padding: 12px 14px; font-size: 14px; margin-bottom: 16px; }
+  .err { color: var(--danger); font-size: 14px; margin-top: 12px; min-height: 18px; }
+  .ok { color: var(--ok); }
+
+  /* Progress */
+  .bar { height: 8px; background: var(--soft); border-radius: 999px; overflow: hidden; margin-top: 10px; }
+  .bar > div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+
+  /* Link box */
+  .linkbox { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+  .linkbox code { flex: 1; overflow-x: auto; white-space: nowrap; background: var(--soft); padding: 12px 14px; border-radius: 10px; font-size: 14px; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  td a { color: var(--ink); font-weight: 600; text-decoration: none; }
+  td a:hover { text-decoration: underline; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .foot { color: var(--muted); font-size: 13px; text-align: center; margin-top: 32px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">Vivid Transfer</div>
+  <nav class="tabs hidden" id="tabs">
+    <button class="tab on" data-tab="send">Send</button>
+    <button class="tab" data-tab="transfers">Transfers</button>
+  </nav>
+</header>
+
+<main id="app"></main>
+
+<script>
+  // Injected by Code.gs (doGet) from the ?t= parameter of the page URL.
+  var INITIAL_TID = new URLSearchParams(location.search).get('t') || null;
+
+  var S = {
+    isOwner: false, ownerEmail: '', publicUrl: '', transfers: [],
+    tab: 'send', tid: INITIAL_TID,
+    who: null,           // { name, email } typed by the visitor, kept for this browser tab only
+    detail: null,        // transfer view for the visitor
+    pending: [],         // files chosen by the owner, not yet uploaded
+    busy: false
+  };
+
+  // ---------- Server calls ----------
+  // Paste your two Apps Script web app addresses here (see README).
+  var OWNER_URL = 'PASTE_OWNER_DEPLOYMENT_URL';   // "Only myself" deployment
+  var PUBLIC_URL = 'PASTE_PUBLIC_DEPLOYMENT_URL'; // "Anyone" deployment
+
+  function jsonp(url, action, args, extra) {
+    return new Promise(function (resolve, reject) {
+      var cb = 'vt_' + Math.random().toString(36).slice(2);
+      var s = document.createElement('script');
+      var timer = setTimeout(function () { finish(); reject(new Error('The server did not respond. Check your connection and try again.')); }, 20000);
+      function finish() { clearTimeout(timer); delete window[cb]; s.remove(); }
+      window[cb] = function (r) {
+        finish();
+        if (r && r.ok) resolve(r.data);
+        else reject(new Error(r && r.error ? r.error : 'Something went wrong.'));
+      };
+      s.onerror = function () { finish(); reject(new Error('Could not reach the server. Check your connection and try again.')); };
+      s.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'api=1&action=' + encodeURIComponent(action) +
+        '&callback=' + cb + '&args=' + encodeURIComponent(JSON.stringify(args)) + (extra || '');
+      document.head.appendChild(s);
+    });
+  }
+
+  function call(action) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    var extra = '&key=' + encodeURIComponent(localStorage.getItem('vt_owner_key') || '') +
+                '&token=' + encodeURIComponent(sessionStorage.getItem('vt_token_' + S.tid) || '');
+    if (S.isOwner) return jsonp(OWNER_URL, action, args, extra);
+    if (action === 'getPageState') {
+      // Try the owner address first; a visitor falls back to the public one.
+      return jsonp(OWNER_URL, action, args, extra).catch(function () { return jsonp(PUBLIC_URL, action, args, extra); });
+    }
+    return jsonp(PUBLIC_URL, action, args, extra);
+  }
+
+  // ---------- Small DOM helpers (no innerHTML with user data) ----------
+  function h(tag, attrs, kids) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k === 'text') n.textContent = v;
+      else if (k === 'class') n.className = v;
+      else if (k === 'on') Object.keys(v).forEach(function (ev) { n.addEventListener(ev, v[ev]); });
+      else if (k === 'value') n.value = v;
+      else n.setAttribute(k, v === true ? '' : v);
+    });
+    (kids || []).forEach(function (c) {
+      if (c === null || c === undefined) return;
+      n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    });
+    return n;
+  }
+  function $app() { return document.getElementById('app'); }
+  function clear() { $app().innerHTML = ''; }
+
+  function fmtBytes(b) {
+    if (!b) return '0 B';
+    if (b < 1024) return b + ' B';
+    var u = ['KB', 'MB', 'GB', 'TB'], i = -1;
+    do { b /= 1024; i++; } while (b >= 1024 && i < u.length - 1);
+    return b.toFixed(b < 10 ? 2 : 1) + ' ' + u[i];
+  }
+  function fmtDate(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' }) + ' IST';
+  }
+  function validEmail(s) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s); }
+  function gateUrl(tid, f) {
+    return S.publicUrl + '?t=' + encodeURIComponent(tid) + '&f=' + encodeURIComponent(f.id) +
+      '&go=1&k=' + encodeURIComponent(sessionStorage.getItem('vt_token_' + tid) || '');
+  }
+  function linkFor(tid) { return S.publicUrl + '?t=' + encodeURIComponent(tid); }
+  function copyText(text, btn) {
+    var done = function () { var old = btn.textContent; btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
+    else { var t = h('textarea', { value: text }); document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e) {} t.remove(); done(); }
+  }
+
+  // ---------- Router ----------
+  function render() {
+    var tabs = document.getElementById('tabs');
+    tabs.classList.toggle('hidden', !(S.isOwner && !S.tid));
+    document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === S.tab); });
+    if (S.tid) return renderTransferPage();
+    if (S.isOwner) return S.tab === 'transfers' ? renderTransfers() : renderSend();
+    clear();
+    $app().appendChild(h('div', { class: 'card' }, [
+      h('h2', { text: 'Open your link' }),
+      h('p', { class: 'sub', text: 'Use the link you were sent to see and send files.' })
+    ]));
+  }
+
+  document.querySelectorAll('.tab').forEach(function (b) {
+    b.addEventListener('click', function () { S.tab = b.dataset.tab; if (S.tab === 'transfers') refreshTransfers(); else render(); });
+  });
+
+  async function refreshTransfers() {
+    try { var st = await call('getPageState'); S.transfers = st.transfers; } catch (e) {}
+    render();
+  }
+
+  // ---------- Owner: Send ----------
+  function renderSend() {
+    clear();
+    var list = h('div', { class: 'files' });
+    var fileInput = h('input', { type: 'file', multiple: true, class: 'hidden' });
+    var total = h('span', { class: 'muted' });
+    var nameIn = h('input', { type: 'text', placeholder: 'Your name', value: (S.who && S.who.name) || '' });
+    var toIn = h('textarea', { placeholder: 'Enter email addresses, separated by commas' });
+    var msgIn = h('textarea', { placeholder: 'Add a message (optional)' });
+    var err = h('div', { class: 'err' });
+    var sendBtn = h('button', { class: 'btn', text: 'Transfer', disabled: true });
+    var addBtn = h('button', { class: 'btn ghost small', text: '+ Add more', on: { click: function () { fileInput.click(); } } });
+
+    function paint() {
+      list.innerHTML = '';
+      var sum = 0;
+      S.pending.forEach(function (f, i) {
+        sum += f.size;
+        list.appendChild(h('div', { class: 'frow' }, [
+          h('div', { class: 'fname', text: f.name }),
+          h('div', { class: 'fsize', text: fmtBytes(f.size) }),
+          h('button', { class: 'x', title: 'Remove', text: '×', on: { click: function () { S.pending.splice(i, 1); paint(); } } })
+        ]));
+      });
+      total.textContent = S.pending.length ? S.pending.length + ' file' + (S.pending.length === 1 ? '' : 's') + ' · ' + fmtBytes(sum) : '';
+      sendBtn.disabled = S.pending.length === 0 || S.busy;
+      drop.classList.toggle('hidden', S.pending.length > 0);
+      addBtn.classList.toggle('hidden', S.pending.length === 0);
+    }
+    function addFiles(fl) {
+      Array.prototype.slice.call(fl).forEach(function (f) { if (f.size > 0) S.pending.push(f); });
+      paint();
+    }
+
+    var drop = h('div', { class: 'drop', on: {
+      click: function () { fileInput.click(); },
+      dragover: function (e) { e.preventDefault(); drop.classList.add('over'); },
+      dragleave: function () { drop.classList.remove('over'); },
+      drop: function (e) { e.preventDefault(); drop.classList.remove('over'); addFiles(e.dataTransfer.files); }
+    } }, [
+      h('div', { class: 'big', text: 'Drag & drop files here' }),
+      h('div', { class: 'small', text: 'or click to browse · up to 50 GB per transfer' })
+    ]);
+
+    fileInput.addEventListener('change', function () { addFiles(fileInput.files); fileInput.value = ''; });
+
+    sendBtn.addEventListener('click', async function () {
+      err.textContent = '';
+      var name = nameIn.value.trim();
+      var recipients = toIn.value.trim();
+      if (!name) return err.textContent = 'Please enter your name.';
+      if (!recipients) return err.textContent = 'Please enter at least one recipient email.';
+      S.busy = true; sendBtn.disabled = true; sendBtn.textContent = 'Creating transfer…';
+      try {
+        var count = S.pending.length;
+        var title = (count === 1 ? S.pending[0].name : count + ' files') + ' from ' + name;
+        var created = await call('createTransfer', title, recipients, msgIn.value.trim());
+        S.who = { name: name, email: S.ownerEmail };
+        await uploadAll(created.id, name, S.ownerEmail, S.pending.slice(), function (label, frac) {
+          progressShow(label, frac);
+        });
+        S.pending = [];
+        S.busy = false;
+        return renderSent(created);
+      } catch (e) {
+        S.busy = false; sendBtn.disabled = false; sendBtn.textContent = 'Transfer';
+        err.textContent = e.message;
+      }
+    });
+
+    var progress = h('div', { class: 'hidden' }, [
+      h('div', { class: 'muted', id: 'progress-text' }),
+      h('div', { class: 'bar' }, [h('div', { id: 'progress-bar' })])
+    ]);
+    function progressShow(label, frac) {
+      progress.classList.remove('hidden');
+      document.getElementById('progress-text').textContent = label + ' (' + Math.round(frac * 100) + '%)';
+      document.getElementById('progress-bar').style.width = (frac * 100).toFixed(1) + '%';
+    }
+
+    $app().appendChild(h('h1', { text: 'Send files' }));
+    $app().appendChild(h('p', { class: 'sub', text: 'Up to 50 GB. Recipients can download for 15 days, and you are notified when they do.' }));
+    $app().appendChild(h('div', { class: 'card' }, [
+      drop,
+      h('div', { class: 'row-actions' }, [total, addBtn]),
+      list,
+      fileInput,
+      h('label', { text: 'Your name' }), nameIn,
+      h('label', { text: 'Send to' }), toIn,
+      h('label', { text: 'Message' }), msgIn,
+      h('div', { class: 'row-actions' }, [h('span', { class: 'muted', text: 'Expires 15 days after sending' }), sendBtn]),
+      progress,
+      err
+    ]));
+    paint();
+  }
+
+  function renderSent(created) {
+    clear();
+    var box = h('div', { class: 'linkbox' }, [h('code', { text: created.url })]);
+    var copyBtn = h('button', { class: 'btn ghost small', text: 'Copy link' });
+    copyBtn.addEventListener('click', function () { copyText(created.url, copyBtn); });
+    box.appendChild(copyBtn);
+    $app().appendChild(h('div', { class: 'card' }, [
+      h('h2', { text: 'Your transfer is on its way' }),
+      h('p', { class: 'sub', text: 'Recipients have been emailed. You will be notified each time someone downloads. Files expire on ' + fmtDate(created.expiresAt) + '.' }),
+      box,
+      h('div', { class: 'row-actions' }, [
+        h('button', { class: 'btn', text: 'Send another', on: { click: function () { S.tab = 'send'; renderSend(); } } }),
+        h('button', { class: 'btn ghost', text: 'View transfers', on: { click: function () { S.tab = 'transfers'; refreshTransfers(); } } })
+      ])
+    ]));
+  }
+
+  // ---------- Owner: Transfers ----------
+  function renderTransfers() {
+    clear();
+    $app().appendChild(h('h1', { text: 'Transfers' }));
+    $app().appendChild(h('p', { class: 'sub', text: 'Every transfer, who it went to, and what has been downloaded.' }));
+    var card = h('div', { class: 'card' });
+    if (!S.transfers.length) {
+      card.appendChild(h('p', { class: 'muted', text: 'No transfers yet.' }));
+    } else {
+      var rows = S.transfers.map(function (t) {
+        var copyBtn = h('button', { class: 'btn ghost small', text: 'Copy link' });
+        copyBtn.addEventListener('click', function () { copyText(t.url, copyBtn); });
+        var editBtn = h('button', { class: 'btn ghost small', text: 'Recipients' });
+        editBtn.addEventListener('click', async function () {
+          var v = window.prompt('Recipient emails, separated by commas', t.recipients);
+          if (v === null) return;
+          try { await call('updateRecipients', t.id, v); await refreshTransfers(); } catch (e) { alert(e.message); }
+        });
+        var delBtn = h('button', { class: 'btn danger small', text: 'Delete now' });
+        delBtn.addEventListener('click', async function () {
+          if (!window.confirm('Delete this transfer and all its files now? This cannot be undone.')) return;
+          try { await call('deleteTransferNow', t.id); await refreshTransfers(); } catch (e) { alert(e.message); }
+        });
+        return h('tr', null, [
+          h('td', null, [h('div', { text: t.title }), h('div', { class: 'fmeta', text: t.recipients })]),
+          h('td', null, [h('span', { class: 'pill ' + t.status, text: t.status })]),
+          h('td', { text: String(t.uploads) }),
+          h('td', null, [h('div', { text: String(t.downloads) }), h('div', { class: 'fmeta', text: t.lastDownload ? 'last ' + fmtDate(t.lastDownload) : 'none yet' })]),
+          h('td', { text: fmtDate(t.expiresAt) }),
+          h('td', null, [h('div', { class: 'actions' }, t.status === 'active' ? [copyBtn, editBtn, delBtn] : [])])
+        ]);
+      });
+      card.appendChild(h('table', null, [
+        h('thead', null, [h('tr', null, ['Transfer', 'Status', 'Uploads', 'Downloads', 'Expires', ''].map(function (x) { return h('th', { text: x }); }))]),
+        h('tbody', null, rows)
+      ]));
+    }
+    $app().appendChild(card);
+  }
+
+  // ---------- Visitor: transfer page (recipients, and the owner opening a link) ----------
+  function renderTransferPage() {
+    clear();
+    if (!S.isOwner && !S.who && !sessionStorage.getItem('vt_token_' + S.tid)) return renderIdentityGate();
+    if (!S.detail) {
+      $app().appendChild(h('p', { class: 'muted', text: 'Loading…' }));
+      loadDetail();
+      return;
+    }
+    renderDetail();
+  }
+
+  function renderIdentityGate() {
+    var err = h('div', { class: 'err' });
+    var card = h('div', { class: 'card' });
+    clear();
+    if (S.gate !== 'code') {
+      var nameIn = h('input', { type: 'text', placeholder: 'Your name', value: (S.who && S.who.name) || '' });
+      var emailIn = h('input', { type: 'email', placeholder: 'Your email', value: (S.who && S.who.email) || '' });
+      var btn = h('button', { class: 'btn', text: 'Send me a code' });
+      var send = function () {
+        var n = nameIn.value.trim(), e = emailIn.value.trim().toLowerCase();
+        if (!n) return err.textContent = 'Please enter your name.';
+        if (!validEmail(e)) return err.textContent = 'Please enter a valid email address.';
+        btn.disabled = true; btn.textContent = 'Sending…'; err.textContent = '';
+        call('requestCode', S.tid, n, e).then(function () {
+          S.who = { name: n, email: e }; S.gate = 'code'; renderIdentityGate();
+        }).catch(function (ex) {
+          err.textContent = ex.message; btn.disabled = false; btn.textContent = 'Send me a code';
+        });
+      };
+      btn.addEventListener('click', send);
+      emailIn.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') send(); });
+      card.appendChild(h('label', { text: 'Your name' })); card.appendChild(nameIn);
+      card.appendChild(h('label', { text: 'Your email' })); card.appendChild(emailIn);
+      card.appendChild(h('div', { class: 'row-actions' }, [btn]));
+      card.appendChild(err);
+      $app().appendChild(h('h1', { text: 'Open your files' }));
+      $app().appendChild(h('p', { class: 'sub', text: 'Enter the name and the email address this link was sent to. We will email you a code.' }));
+      $app().appendChild(card);
+    } else {
+      var codeIn = h('input', { type: 'text', placeholder: '6-digit code', inputmode: 'numeric', maxlength: '6' });
+      var vbtn = h('button', { class: 'btn', text: 'Open files' });
+      var verify = function () {
+        var c = codeIn.value.trim();
+        if (!/^\d{6}$/.test(c)) return err.textContent = 'Enter the 6-digit code from the email.';
+        vbtn.disabled = true; vbtn.textContent = 'Checking…'; err.textContent = '';
+        call('verifyCode', S.tid, S.who.email, c).then(function (r) {
+          sessionStorage.setItem('vt_token_' + S.tid, r.token);
+          S.gate = null; S.detail = null; render();
+        }).catch(function (ex) {
+          err.textContent = ex.message; vbtn.disabled = false; vbtn.textContent = 'Open files';
+        });
+      };
+      vbtn.addEventListener('click', verify);
+      codeIn.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') verify(); });
+      var resend = h('button', { class: 'btn ghost small', text: 'Send a new code', on: { click: function () { S.gate = null; renderIdentityGate(); } } });
+      card.appendChild(h('p', { class: 'muted', text: 'We sent a code to ' + S.who.email + '. It expires in 10 minutes.' }));
+      card.appendChild(h('label', { text: 'Code' })); card.appendChild(codeIn);
+      card.appendChild(h('div', { class: 'row-actions' }, [vbtn, resend]));
+      card.appendChild(err);
+      $app().appendChild(h('h1', { text: 'Enter your code' }));
+      $app().appendChild(card);
+    }
+  }
+
+  async function loadDetail() {
+    try {
+      S.detail = await call('getTransferView', S.tid, S.who ? S.who.name : '', S.who ? S.who.email : '');
+      renderTransferPage();
+    } catch (e) {
+      if (/confirm your email/i.test(e.message)) {
+        sessionStorage.removeItem('vt_token_' + S.tid);
+        S.gate = null;
+        renderTransferPage();
+        return;
+      }
+      clear();
+      $app().appendChild(h('div', { class: 'card' }, [
+        h('h2', { text: 'We could not open this transfer' }),
+        h('p', { class: 'sub', text: e.message }),
+        h('button', { class: 'btn ghost', text: 'Try again', on: { click: function () { renderTransferPage(); } } })
+      ]));
+    }
+  }
+
+  function renderDetail() {
+    var d = S.detail;
+    clear();
+    $app().appendChild(h('h1', { text: d.title }));
+    if (!d.active) {
+      $app().appendChild(h('div', { class: 'card' }, [
+        h('h2', { text: 'These files are gone' }),
+        h('p', { class: 'sub', text: 'This transfer has expired and been deleted, so the files are no longer available.' })
+      ]));
+      return;
+    }
+    $app().appendChild(h('p', { class: 'sub', text: 'Available until ' + fmtDate(d.expiresAt) + ' · ' + d.daysLeft + ' day' + (d.daysLeft === 1 ? '' : 's') + ' left' }));
+    if (d.daysLeft <= 2) {
+      $app().appendChild(h('div', { class: 'banner', text: 'These files expire soon. Download them now.' }));
+    }
+
+    var filesCard = h('div', { class: 'card' });
+    filesCard.appendChild(h('h2', { text: d.files.length ? d.files.length + ' file' + (d.files.length === 1 ? '' : 's') + ' · ' + fmtBytes(d.usedBytes) : 'No files yet' }));
+    filesCard.appendChild(h('p', { class: 'muted', text: 'Downloads are recorded and the sender is notified.' }));
+    var list = h('div', { class: 'files' });
+    d.files.forEach(function (f) {
+      list.appendChild(h('div', { class: 'frow' }, [
+        h('div', { class: 'fname' }, [h('div', { text: f.name }), h('div', { class: 'fmeta', text: (f.uploadedBy ? f.uploadedBy + ' · ' : '') + fmtDate(f.uploaded) })]),
+        h('div', { class: 'fsize', text: fmtBytes(f.size) }),
+        h('a', { class: 'btn small', href: gateUrl(d.id, f), text: 'Download' })
+      ]));
+    });
+    filesCard.appendChild(list);
+    $app().appendChild(filesCard);
+
+    // Upload card for this transfer
+    var fileInput = h('input', { type: 'file', multiple: true, class: 'hidden' });
+    var status = h('div', { class: 'err' });
+    var drop = h('div', { class: 'drop', on: {
+      click: function () { fileInput.click(); },
+      dragover: function (e) { e.preventDefault(); drop.classList.add('over'); },
+      dragleave: function () { drop.classList.remove('over'); },
+      drop: function (e) { e.preventDefault(); drop.classList.remove('over'); startUpload(e.dataTransfer.files); }
+    } }, [
+      h('div', { class: 'big', text: 'Add files to this transfer' }),
+      h('div', { class: 'small', text: 'Drag & drop or click to browse · up to 50 GB in total' })
+    ]);
+    fileInput.addEventListener('change', function () { startUpload(fileInput.files); fileInput.value = ''; });
+    async function startUpload(fl) {
+      var files = Array.prototype.slice.call(fl);
+      if (!files.length || S.busy) return;
+      S.busy = true; status.textContent = '';
+      try {
+        await uploadAll(S.tid, S.who ? S.who.name : '', S.who ? S.who.email : '', files, function (label, frac) {
+          status.classList.remove('err'); status.textContent = label + ' (' + Math.round(frac * 100) + '%)';
+        });
+        status.classList.add('ok'); status.textContent = 'Uploaded.';
+        S.detail = null;
+        loadDetail();
+      } catch (e) {
+        status.classList.add('err'); status.textContent = e.message;
+      } finally {
+        S.busy = false;
+      }
+    }
+    $app().appendChild(h('div', { class: 'card' }, [drop, fileInput, status]));
+  }
+
+  // ---------- Uploads (shared by the owner and visitors) ----------
+  async function uploadAll(tid, name, email, files, onProgress) {
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      var label = 'File ' + (i + 1) + ' of ' + files.length + ': ' + file.name;
+      onProgress(label, 0);
+      var sess = await call('createUploadSession', tid, name, email, file.name, file.size, file.type);
+      var fileId = await uploadOne(sess, file, function (frac) { onProgress(label, frac); });
+      await call('confirmUpload', tid, sess.sessionId, fileId);
+      onProgress(label, 1);
+    }
+  }
+
+  // Resumable upload straight to Google Drive, in chunks.
+  async function uploadOne(sess, file, onFrac) {
+    var size = file.size, chunk = sess.chunkSize, start = 0;
+    while (true) {
+      var end = Math.min(start + chunk, size);
+      var attempt = 0, res = null;
+      while (true) {
+        try {
+          res = await fetch(sess.uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Range': 'bytes ' + start + '-' + (end - 1) + '/' + size },
+            body: file.slice(start, end)
+          });
+          if (res.status === 308 || res.status === 200 || res.status === 201) break;
+          if (res.status >= 500 || res.status === 429) throw new Error('retry');
+          throw new Error('Upload stopped (HTTP ' + res.status + ').');
+        } catch (err) {
+          if (err.message.indexOf('Upload stopped') === 0) throw err;
+          attempt++;
+          if (attempt >= 4) throw new Error('Upload of ' + file.name + ' failed. Check your connection and try again.');
+          await new Promise(function (r) { setTimeout(r, 2000 * attempt); });
+        }
+      }
+      if (res.status === 200 || res.status === 201) {
+        var body = await res.json();
+        return body.id;
+      }
+      start = end;
+      onFrac(start / size);
+      if (start >= size) throw new Error('Upload of ' + file.name + ' did not finish. Please try again.');
+    }
+  }
+
+  // ---------- Start ----------
+  if (new URLSearchParams(location.search).get('owner') === '1' && !localStorage.getItem('vt_owner_key')) {
+    var typedKey = window.prompt('Enter your owner key (it stays in this browser only):');
+    if (typedKey) localStorage.setItem('vt_owner_key', typedKey.trim());
+  }
+  (async function boot() {
+    try {
+      var st = await call('getPageState');
+      S.isOwner = st.isOwner;
+      S.ownerEmail = st.ownerEmail;
+      S.publicUrl = st.publicUrl;
+      S.transfers = st.transfers;
+    } catch (e) {
+      clear();
+      $app().appendChild(h('div', { class: 'card' }, [h('h2', { text: 'Something went wrong' }), h('p', { class: 'sub', text: e.message })]));
+      return;
+    }
+    render();
+  })();
+</script>
+</body>
+</html>
